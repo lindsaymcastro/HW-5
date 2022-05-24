@@ -28,6 +28,7 @@ library(corrplot)
 library(klaR) 
 library(pROC)
 library(glmnet)
+library(dplyr)
 tidymodels_prefer()
 
 ```
@@ -67,8 +68,7 @@ pokemon <- pokemon %>%
 
 pokemon$type_1 <- as.factor(pokemon$type_1)
 pokemon$legendary <- as.factor(pokemon$legendary)
-
-pokemon
+pokemon$generation <- as.factor(pokemon$generation)
 ```
 
 There are 18 classes of the outcomes for type_1. There are a couple of Pokemon types that do have very few Pokemon. Those are Flying, Fairy, Ice, and Fighting because the have less than 30. 
@@ -100,8 +100,9 @@ pokemon_fold <- vfold_cv(pokemon_train, strata = type_1, v = 5)
 pokemon_recipe <- recipe(type_1 ~ legendary + generation + sp_atk +
                            attack + speed + defense + hp + sp_def,
                          data = pokemon_train) %>%
-  step_dummy(legendary, generation) %>%
+  step_dummy(c(legendary, generation)) %>%
   step_normalize(all_predictors())
+
 ```
 
 
@@ -109,6 +110,7 @@ pokemon_recipe <- recipe(type_1 ~ legendary + generation + sp_atk +
 ```{r}
 pokemon_mod <- 
   multinom_reg(penalty = tune(), mixture = tune()) %>%
+  set_mode("classification") %>%
   set_engine("glmnet")
 
 pokemon_wf <- workflow() %>%
@@ -118,23 +120,76 @@ pokemon_wf <- workflow() %>%
 reg_grid <- grid_regular(penalty(range = c(-5, 5)), 
                          mixture(range = c(0, 1)), 
                          levels = 10)
-reg_grid
 
 ```
 
-We’ll be fitting and tuning an elastic net, tuning penalty and mixture (use multinom_reg with the glmnet engine).
-
-Set up this model and workflow. Create a regular grid for penalty and mixture with 10 levels each; mixture should range from 0 to 1. For this assignment, we’ll let penalty range from -5 to 5 (it’s log-scaled).
-
 How many total models will you be fitting when you fit these models to your folded data?
+There will be a total of 50 ????? models because there are 5 folds fitted to 10 different levels????
+
+Or maybe there is 500 models because the range for penalty is 10 across 10 levels, for 5 folds (all multiplied is 500)
 
 
+### Exercise 6 
+```{r, message=FALSE}
+pokemon_res <- tune_grid(
+  pokemon_wf,
+  resamples = pokemon_fold,
+  grid = reg_grid,
+  control = control_grid(verbose = TRUE)
+)
+
+autoplot(pokemon_res)
+```
+
+Smaller values of penalty produce better accuracy and ROC AUC, however for mixture the values differ from 0.444 to 0.777 for better accuracy and ROC 
+AUC respectively.
 
 
+### Exercise 7 
+```{r}
+#Choose model with optimal roc_auc
+best <- select_best(pokemon_res, metric = "roc_auc")
+best
+
+#Fit model to training set
+pokemon_final <- finalize_workflow(pokemon_wf, best)
+pokemon_final_fit <- fit(pokemon_final, data = pokemon_train)
+
+#Evaluate training set
+multi_metric <- metric_set(accuracy, sensitivity, specificity)
+augment(pokemon_final_fit, new_data = pokemon_train) %>%
+  multi_metric(truth = type_1, estimate = .pred_class)
+
+#Evaluate testing set
+augment(pokemon_final_fit, new_data = pokemon_test) %>%
+  multi_metric(truth = type_1, estimate = .pred_class)
+  
+```
 
 
+### Exercise 8 
+```{r}
+library(yardstick)
+# Overall ROC AUC
+augment(pokemon_final_fit, new_data = pokemon_test) %>%
+  roc_auc(truth = type_1, .pred_Bug, .pred_Fire, .pred_Grass, .pred_Normal, .pred_Psychic, .pred_Water)
+
+# Plots
+augment(pokemon_final_fit, new_data = pokemon_test) %>%
+  roc_curve(truth = type_1, .pred_Bug, .pred_Fire, .pred_Grass, .pred_Normal, .pred_Psychic, .pred_Water) %>%
+  autoplot()
+
+# Heatmap of Confusion Matrix
+augment(pokemon_final_fit, new_data = pokemon_test) %>%
+  conf_mat(truth = type_1, estimate = .pred_class) %>%
+  autoplot(type = "heatmap")
+```
 
 
+Based off the heatmap, the model does the best at predicting Normal and Water types, and its the worst at predicting 
+Fire, and Grass. Based off the plots for the different ROC curves, Normal types makes sense on why it is the best at 
+predicting it correctly, however it does not make much sense for the Water type since the ROC curve seems to be low. It 
+also seems that the model overpredicts the type Water for all the other types as well. 
 
 
 
