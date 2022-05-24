@@ -44,7 +44,7 @@ pokemon <- read.csv(file = "homework-5/data/pokemon.csv")
 library(janitor)
 
 pokemon <- clean_names(pokemon)
-pokemon
+head(pokemon)
 ```
 
 After using the clean_names() function, it changed the variable names to all appear as lowercase and replaced the periods with '_' which also
