@@ -1,0 +1,153 @@
+---
+title: "Homework 5"
+output:
+  html_document:
+    toc: yes
+    toc_float: yes
+    code_folding: show
+  pdf_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE,
+                      warning = FALSE)
+```
+
+
+## Elastic Net Tuning 
+```{r, message=FALSE}
+library(tidymodels)
+library(tidyverse)
+library(ISLR) 
+library(ISLR2) 
+library(discrim)
+library(poissonreg)
+library(corrr)
+library(corrplot)
+library(klaR) 
+library(pROC)
+library(glmnet)
+tidymodels_prefer()
+
+```
+
+
+```{r}
+pokemon <- read.csv(file = "homework-5/data/pokemon.csv")
+```
+
+
+### Exercise 1 
+```{r}
+library(janitor)
+
+pokemon <- clean_names(pokemon)
+pokemon
+```
+
+After using the clean_names() function, it changed the variable names to all appear as lowercase and replaced the periods with '_' which also
+represent spaces in the names themselves. clean_names() is useful because it allows all the variable names to follow the same format to avoid
+confusion especially when they are going to be called later on. 
+
+
+
+### Exercise 2 
+```{r}
+type1bar <- ggplot(data = pokemon, aes(x = type_1)) +
+  geom_bar(stat = "count", width = 0.7, fill = "steelblue")+
+  theme_minimal()+
+  geom_text(stat = 'count', aes(label = ..count..), hjust = .4, vjust = -1)+
+  labs(title = "Type 1 Classes", x = "Classes", y = "Count")
+type1bar
+
+pokemon <- pokemon %>%
+  filter(type_1 == "Bug" | type_1 == "Fire" | type_1 == "Grass" | type_1 ==  "Normal" | type_1 ==  "Water" | type_1 == "Psychic")
+
+
+pokemon$type_1 <- as.factor(pokemon$type_1)
+pokemon$legendary <- as.factor(pokemon$legendary)
+
+pokemon
+```
+
+There are 18 classes of the outcomes for type_1. There are a couple of Pokemon types that do have very few Pokemon. Those are Flying, Fairy, Ice, and Fighting because the have less than 30. 
+
+
+### Exercise 3 
+```{r}
+set.seed(0714)
+
+# Initial Split
+pokemon_split <- initial_split(pokemon, strata = type_1, prop = 0.7)
+pokemon_split
+
+#Separate into training and testing
+pokemon_train <- training(pokemon_split)
+pokemon_test <- testing(pokemon_split)
+
+# Verify correct # of observations
+dim(pokemon_train)
+dim(pokemon_test)
+
+# V-fold cross validation
+pokemon_fold <- vfold_cv(pokemon_train, strata = type_1, v = 5)
+```
+
+
+### Exercise 4 
+```{r}
+pokemon_recipe <- recipe(type_1 ~ legendary + generation + sp_atk +
+                           attack + speed + defense + hp + sp_def,
+                         data = pokemon_train) %>%
+  step_dummy(legendary, generation) %>%
+  step_normalize(all_predictors())
+```
+
+
+### Exercise 5 
+```{r}
+pokemon_mod <- 
+  multinom_reg(penalty = tune(), mixture = tune()) %>%
+  set_engine("glmnet")
+
+pokemon_wf <- workflow() %>%
+  add_recipe(pokemon_recipe) %>%
+  add_model(pokemon_mod)
+
+reg_grid <- grid_regular(penalty(range = c(-5, 5)), 
+                         mixture(range = c(0, 1)), 
+                         levels = 10)
+reg_grid
+
+```
+
+We’ll be fitting and tuning an elastic net, tuning penalty and mixture (use multinom_reg with the glmnet engine).
+
+Set up this model and workflow. Create a regular grid for penalty and mixture with 10 levels each; mixture should range from 0 to 1. For this assignment, we’ll let penalty range from -5 to 5 (it’s log-scaled).
+
+How many total models will you be fitting when you fit these models to your folded data?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
