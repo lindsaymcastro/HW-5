@@ -122,11 +122,7 @@ reg_grid <- grid_regular(penalty(range = c(-5, 5)),
                          levels = 10)
 
 ```
-
-How many total models will you be fitting when you fit these models to your folded data?
-There will be a total of 50 ????? models because there are 5 folds fitted to 10 different levels????
-
-Or maybe there is 500 models because the range for penalty is 10 across 10 levels, for 5 folds (all multiplied is 500)
+There will be 500 models fitted because the range for penalty is 10 across 10 levels, for 5 folds (all multiplied is 500)
 
 
 ### Exercise 6 
